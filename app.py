@@ -277,3 +277,178 @@ else:
 
 st.warning("Limitações atuais: o estúdio prepara briefings, prompts e planos, mas ainda não gera imagens automaticamente nem analisa a imagem com IA. Também não há conexão automática ao Instagram nem armazenamento permanente. Essas serão as próximas integrações.")
 st.caption("A meta de 1.000 novos seguidores por semana é um objetivo, não uma promessa de resultado.")
+
+
+# ---- Inteligência de Público ----
+st.divider()
+st.header("🧠 Inteligência de Público")
+st.write(
+    "Construa uma hipótese de público, registre o que os conteúdos mostram e refine as recomendações. "
+    "Até a conexão oficial com o Instagram, os dados e conclusões abaixo são baseados nas informações inseridas manualmente."
+)
+
+tab_publico, tab_conteudo, tab_recomendacoes = st.tabs([
+    "👥 Perfil do público",
+    "📊 Evidências dos conteúdos",
+    "🎯 Recomendações"
+])
+
+with tab_publico:
+    st.subheader("1. Público que queremos alcançar")
+    st.caption("Este perfil inicial é uma hipótese baseada nos temas do perfil — não representa dados demográficos confirmados dos seguidores.")
+    c1, c2 = st.columns(2)
+    with c1:
+        publico_idade = st.selectbox("Faixa etária prioritária (hipótese)", [
+            "18–24 anos", "25–34 anos", "35–44 anos", "45+ anos", "Ainda não sei"
+        ], index=1)
+        publico_prioridade = st.selectbox("Interesse principal a testar", [
+            "Casa e decoração", "Organização", "Beleza e autocuidado",
+            "Maternidade", "Achadinhos variados"
+        ])
+        publico_poder_compra = st.selectbox("Posicionamento de preço", [
+            "Econômico e acessível", "Mistura de preços", "Qualidade acima do preço"
+        ])
+    with c2:
+        publico_motivacao = st.multiselect("Desejos que queremos atender", [
+            "Deixar a casa bonita gastando pouco", "Organizar melhor a rotina",
+            "Encontrar produtos úteis", "Cuidar de si", "Facilitar a maternidade",
+            "Encontrar presentes", "Descobrir novidades"
+        ], default=["Deixar a casa bonita gastando pouco", "Encontrar produtos úteis"])
+        publico_formato = st.multiselect("Formatos para testar", [
+            "Carrossel de achadinhos", "Reel demonstrando produto",
+            "Imagem realista com texto curto", "Antes e depois",
+            "Lista de produtos", "Stories com enquete"
+        ], default=["Carrossel de achadinhos", "Reel demonstrando produto"])
+    dores = st.text_area(
+        "Dúvidas ou dificuldades que queremos abordar",
+        placeholder="Ex.: pouco espaço em casa, orçamento limitado, falta de tempo..."
+    )
+    if st.button("💾 Salvar perfil de público nesta sessão"):
+        st.session_state["perfil_publico_amanda"] = {
+            "Faixa etária (hipótese)": publico_idade,
+            "Interesse principal": publico_prioridade,
+            "Posicionamento de preço": publico_poder_compra,
+            "Desejos": ", ".join(publico_motivacao),
+            "Formatos para testar": ", ".join(publico_formato),
+            "Dúvidas/dificuldades": dores
+        }
+        st.success("Perfil de hipótese salvo nesta sessão.")
+    if "perfil_publico_amanda" in st.session_state:
+        st.markdown("#### Perfil atual")
+        st.json(st.session_state["perfil_publico_amanda"])
+
+with tab_conteudo:
+    st.subheader("2. Registre evidências reais")
+    st.write("Adicione resultados de publicações para comparar temas e formatos. Use os números do Instagram Insights quando disponíveis.")
+    with st.form("evidencias_publico_form"):
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            ev_tema = st.selectbox("Tema", ["Casa e decoração", "Organização", "Beleza", "Maternidade", "Achadinhos variados", "Outro"])
+            ev_formato = st.selectbox("Formato", ["Carrossel", "Reel", "Imagem única", "Stories"])
+        with e2:
+            ev_alcance = st.number_input("Contas alcançadas", min_value=0, step=10, key="ev_alcance")
+            ev_salvos = st.number_input("Salvamentos", min_value=0, step=1, key="ev_salvos")
+        with e3:
+            ev_compartilhados = st.number_input("Compartilhamentos", min_value=0, step=1, key="ev_compartilhados")
+            ev_seguidores = st.number_input("Seguidores atribuídos (se disponível)", min_value=0, step=1, key="ev_seguidores")
+        ev_data = st.date_input("Data da publicação", value=date.today(), key="ev_data")
+        registrar_evidencia = st.form_submit_button("➕ Registrar evidência")
+    ev_cols = ["Data", "Tema", "Formato", "Alcance", "Salvamentos", "Compartilhamentos", "Seguidores atribuídos"]
+    if "evidencias_publico" not in st.session_state:
+        st.session_state["evidencias_publico"] = pd.DataFrame(columns=ev_cols)
+    if registrar_evidencia:
+        nova = pd.DataFrame([{
+            "Data": ev_data.isoformat(), "Tema": ev_tema, "Formato": ev_formato,
+            "Alcance": ev_alcance, "Salvamentos": ev_salvos,
+            "Compartilhamentos": ev_compartilhados, "Seguidores atribuídos": ev_seguidores
+        }])
+        st.session_state["evidencias_publico"] = pd.concat(
+            [st.session_state["evidencias_publico"], nova], ignore_index=True
+        )
+        st.success("Evidência registrada nesta sessão.")
+    evidencias = st.session_state["evidencias_publico"]
+    if not evidencias.empty:
+        st.dataframe(evidencias, use_container_width=True, hide_index=True)
+        st.download_button(
+            "⬇️ Baixar evidências em CSV",
+            data=evidencias.to_csv(index=False).encode("utf-8-sig"),
+            file_name="inteligencia_publico_amanda.csv",
+            mime="text/csv"
+        )
+        resumo = evidencias.copy()
+        for col in ["Alcance", "Salvamentos", "Compartilhamentos", "Seguidores atribuídos"]:
+            resumo[col] = pd.to_numeric(resumo[col], errors="coerce").fillna(0)
+        resumo["Salvamentos por 100 alcançados"] = resumo.apply(
+            lambda r: round(r["Salvamentos"] / r["Alcance"] * 100, 2) if r["Alcance"] else 0, axis=1
+        )
+        resumo["Compartilhamentos por 100 alcançados"] = resumo.apply(
+            lambda r: round(r["Compartilhamentos"] / r["Alcance"] * 100, 2) if r["Alcance"] else 0, axis=1
+        )
+        st.markdown("#### Comparação por tema")
+        comparacao = resumo.groupby("Tema", as_index=False).agg({
+            "Alcance": "mean",
+            "Salvamentos": "mean",
+            "Compartilhamentos": "mean",
+            "Seguidores atribuídos": "sum",
+            "Salvamentos por 100 alcançados": "mean",
+            "Compartilhamentos por 100 alcançados": "mean"
+        }).round(2)
+        st.dataframe(comparacao.sort_values("Seguidores atribuídos", ascending=False), use_container_width=True, hide_index=True)
+        st.caption("Compare temas com cuidado: quantidade de publicações, formato, data e tamanho da amostra podem alterar os resultados.")
+    else:
+        st.info("Registre algumas publicações para começar a comparar. Ainda não há dados suficientes para afirmar qual público ou tema vence.")
+
+with tab_recomendacoes:
+    st.subheader("3. Próximos testes sugeridos")
+    perfil = st.session_state.get("perfil_publico_amanda", {})
+    evidencias = st.session_state.get("evidencias_publico", pd.DataFrame())
+    if not evidencias.empty:
+        tmp = evidencias.copy()
+        for col in ["Alcance", "Salvamentos", "Compartilhamentos", "Seguidores atribuídos"]:
+            tmp[col] = pd.to_numeric(tmp[col], errors="coerce").fillna(0)
+        ranking = tmp.groupby("Tema", as_index=False).agg({
+            "Alcance": "mean",
+            "Salvamentos": "mean",
+            "Compartilhamentos": "mean",
+            "Seguidores atribuídos": "sum"
+        })
+        ranking["Taxa de salvamento (%)"] = ranking.apply(
+            lambda r: round(r["Salvamentos"] / r["Alcance"] * 100, 2) if r["Alcance"] else 0, axis=1
+        )
+        ranking["Taxa de compartilhamento (%)"] = ranking.apply(
+            lambda r: round(r["Compartilhamentos"] / r["Alcance"] * 100, 2) if r["Alcance"] else 0, axis=1
+        )
+        ranking = ranking.sort_values(
+            ["Seguidores atribuídos", "Taxa de compartilhamento (%)", "Taxa de salvamento (%)"],
+            ascending=False
+        )
+        melhor = ranking.iloc[0]
+        st.success(
+            f"Com os registros inseridos, **{melhor['Tema']}** lidera pela soma de seguidores atribuídos. "
+            "Isso é um sinal inicial, não uma prova definitiva: confira também o número de publicações e o alcance."
+        )
+        st.dataframe(ranking, use_container_width=True, hide_index=True)
+        st.markdown("**Teste recomendado:** crie duas publicações sobre o tema que lidera, usando ganchos e formatos diferentes. Compare os resultados após um período semelhante.")
+    else:
+        st.info("Depois de registrar resultados na aba “Evidências dos conteúdos”, esta área mostrará uma comparação inicial.")
+    st.markdown("#### Ideias iniciais para testar")
+    interesse = perfil.get("Interesse principal", publico_prioridade)
+    if interesse == "Casa e decoração":
+        st.write("• Carrossel: “5 detalhes que deixam a casa mais aconchegante sem gastar muito”.")
+        st.write("• Reel: mostre um produto de decoração em uso, com escala real e detalhes honestos.")
+    elif interesse == "Organização":
+        st.write("• Reel: “Uma solução simples para aproveitar melhor este espaço”.")
+        st.write("• Carrossel: organizadores e usos práticos para gavetas, armários ou cozinha.")
+    elif interesse == "Beleza e autocuidado":
+        st.write("• Reel: demonstração honesta de um produto e o que verificar antes de comprar.")
+        st.write("• Carrossel: itens acessíveis de autocuidado, sem prometer resultados não comprovados.")
+    elif interesse == "Maternidade":
+        st.write("• Reel: produtos que podem ajudar em uma tarefa real da rotina familiar.")
+        st.write("• Carrossel: ideias úteis para mães, com benefícios e limitações apresentados com honestidade.")
+    else:
+        st.write("• Carrossel: “Achadinhos úteis que valem conhecer”.")
+        st.write("• Reel: mostre um produto em uso e explique para quem ele pode ser útil.")
+    st.warning(
+        "Limite desta versão: não lê o Instagram automaticamente, não identifica seguidores individualmente e não confirma idade, gênero ou localização. "
+        "Os registros ficam apenas na sessão atual; baixe o CSV para guardar uma cópia. A integração oficial e o armazenamento permanente serão etapas futuras."
+    )
